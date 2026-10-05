@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Layers, Shapes, BookOpen, Trash2, Plus, Image as ImageIcon, Type } from 'lucide-react';
 import type { CanvasItem } from '../types/pdf';
 import { THAI_FONTS } from '../utils/thaiFonts';
+import { PageThumbnail } from './PageThumbnail';
 
 interface SidebarProps {
+  pdfDoc?: any;
   currentPage: number;
   totalPages: number;
   onPageSelect: (page: number) => void;
@@ -15,6 +17,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  pdfDoc,
   currentPage,
   totalPages,
   onPageSelect,
@@ -77,36 +80,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <p className="text-[11px] text-slate-400 font-medium px-1">
               เลือกหน้าที่ต้องการแก้ไข:
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2.5">
               {Array.from({ length: totalPages }).map((_, i) => {
                 const pageNum = i + 1;
                 const pageBoxesCount = textBoxes.filter((b) => b.pageIndex === i).length;
-                const isCurrent = pageNum === currentPage;
 
                 return (
-                  <button
+                  <PageThumbnail
                     key={pageNum}
+                    pdfDoc={pdfDoc}
+                    pageNum={pageNum}
+                    isSelected={pageNum === currentPage}
+                    boxCount={pageBoxesCount}
                     onClick={() => onPageSelect(pageNum)}
-                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer relative ${
-                      isCurrent
-                        ? 'border-blue-600 bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs'
-                        : 'border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-bold ${isCurrent ? 'text-blue-700' : 'text-slate-700'}`}>
-                        หน้า {pageNum}
-                      </span>
-                      {pageBoxesCount > 0 && (
-                        <span className="text-[10px] px-1.5 py-0.2 bg-blue-200 text-blue-800 rounded-full font-bold">
-                          {pageBoxesCount}
-                        </span>
-                      )}
-                    </div>
-                    <div className="w-full aspect-3/4 mt-1.5 rounded border border-slate-200 bg-white flex items-center justify-center text-slate-300 text-xs">
-                      {isCurrent ? 'กำลังดู' : `P.${pageNum}`}
-                    </div>
-                  </button>
+                  />
                 );
               })}
             </div>

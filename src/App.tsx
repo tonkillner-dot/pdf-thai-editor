@@ -75,6 +75,81 @@ export const App: React.FC = () => {
     }
   };
 
+  // Keyboard shortcuts (Delete, Escape, Ctrl+Z, Ctrl+Y, Ctrl+D, Arrow keys nudge)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable;
+
+      // Deselect on Escape
+      if (e.key === 'Escape') {
+        setSelectedBoxId(null);
+        return;
+      }
+
+      // Undo / Redo shortcuts
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      // Duplicate shortcut (Ctrl+D)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        if (selectedBoxId) {
+          e.preventDefault();
+          handleDuplicateBox();
+        }
+        return;
+      }
+
+      // If user is actively typing in text box or input, let standard text editing handle it
+      if (isInput) return;
+
+      // Delete selected box
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedBoxId) {
+          e.preventDefault();
+          handleDeleteBox(selectedBoxId);
+        }
+      }
+
+      // Arrow keys nudge selected element position
+      if (selectedBoxId && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        e.preventDefault();
+        const step = e.shiftKey ? 2 : 0.5; // Shift = faster nudge
+        const currentItem = canvasItems.find((b) => b.id === selectedBoxId);
+        if (!currentItem) return;
+
+        let newX = currentItem.xPercent;
+        let newY = currentItem.yPercent;
+
+        if (e.key === 'ArrowUp') newY = Math.max(0, newY - step);
+        if (e.key === 'ArrowDown') newY = Math.min(98, newY + step);
+        if (e.key === 'ArrowLeft') newX = Math.max(0, newX - step);
+        if (e.key === 'ArrowRight') newX = Math.min(98, newX + step);
+
+        handleUpdateBox(selectedBoxId, { xPercent: newX, yPercent: newY });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedBoxId, canvasItems, historyIndex, history]);
+
   // Support paste image from clipboard (Ctrl+V)
   useEffect(() => {
     const handlePaste = (e: ClipboardEvent) => {
@@ -314,6 +389,82 @@ export const App: React.FC = () => {
     setSelectedBoxId(newBox.id);
   };
 
+  // Add Whiteout (ลบหรือปิดทับข้อความเดิมใน PDF)
+  const handleAddWhiteout = () => {
+    const whiteoutBox: CanvasItem = {
+      id: `whiteout-${Date.now()}`,
+      type: 'text',
+      pageIndex: currentPage - 1,
+      xPercent: 30,
+      yPercent: 30 + (canvasItems.length % 5) * 4,
+      widthPercent: 35,
+      heightPercent: 5,
+      rotation: 0,
+      text: '',
+      backgroundColor: '#ffffff',
+      isSolidBackground: true,
+      borderWidth: 0,
+      borderColor: 'transparent',
+      borderRadius: 2,
+      padding: 0,
+      opacity: 1,
+    };
+
+    const nextItems = [...canvasItems, whiteoutBox];
+    pushHistory(nextItems);
+    setSelectedBoxId(whiteoutBox.id);
+  };
+
+  // Insert math symbol
+  const handleInsertMathSymbol = (sym: string) => {
+    if (selectedBoxId) {
+      const box = canvasItems.find((b) => b.id === selectedBoxId);
+      if (box && (box.type === 'text' || !box.type)) {
+        handleUpdateBox(selectedBoxId, { text: (box.text || '') + sym });
+        return;
+      }
+    }
+
+    // If none selected, create a new text box with this symbol
+    const newBox: CanvasItem = {
+      id: `box-${Date.now()}`,
+      type: 'text',
+      pageIndex: currentPage - 1,
+      xPercent: 40,
+      yPercent: 35,
+      widthPercent: 15,
+      heightPercent: 6,
+      rotation: 0,
+      text: sym,
+      fontFamily: 'Prompt',
+      fontSize: 22,
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      color: '#1e3a8a',
+      backgroundColor: 'transparent',
+      isSolidBackground: false,
+      borderWidth: 0,
+      borderColor: 'transparent',
+      borderRadius: 4,
+      textAlign: 'center',
+      padding: 4,
+      opacity: 1,
+    };
+
+    const nextItems = [...canvasItems, newBox];
+    pushHistory(nextItems);
+    setSelectedBoxId(newBox.id);
+  };
+
+  // Fit Width calculation
+  const handleFitWidth = () => {
+    // Calculate suitable zoom based on available screen space
+    const availableWidth = window.innerWidth - 320;
+    const standardA4Width = 794; // approx display width at 1.0 zoom
+    const targetZoom = Math.max(0.6, Math.min(1.6, availableWidth / standardA4Width));
+    setZoom(parseFloat(targetZoom.toFixed(2)));
+  };
+
   // Add quick stamp
   const handleSelectStamp = (stamp: (typeof QUICK_STAMPS)[0]) => {
     const newBox: CanvasItem = {
@@ -445,9 +596,11 @@ export const App: React.FC = () => {
           <Toolbar
             selectedBox={selectedBox}
             onAddTextBox={() => handleAddTextBox('Sarabun')}
+            onAddWhiteout={handleAddWhiteout}
             onOpenShapes={() => setIsShapesModalOpen(true)}
             onOpenImageUpload={() => imageInputRef.current?.click()}
             onOpenStamps={() => setIsStampsModalOpen(true)}
+            onInsertMathSymbol={handleInsertMathSymbol}
             onUpdateSelectedBox={(updates) => {
               if (selectedBoxId) handleUpdateBox(selectedBoxId, updates);
             }}
@@ -460,6 +613,7 @@ export const App: React.FC = () => {
             onPageChange={(p) => setCurrentPage(p)}
             zoom={zoom}
             onZoomChange={(z) => setZoom(z)}
+            onFitWidth={handleFitWidth}
             canUndo={historyIndex > 0}
             canRedo={historyIndex < history.length - 1}
             onUndo={handleUndo}
@@ -468,8 +622,9 @@ export const App: React.FC = () => {
 
           {/* Canvas & Sidebar Split */}
           <div className="flex flex-1 overflow-hidden">
-            {/* Sidebar (Pages, Layers, Fonts) */}
+            {/* Sidebar (Pages with Live Thumbnails, Layers, Fonts) */}
             <Sidebar
+              pdfDoc={pdfDoc}
               currentPage={currentPage}
               totalPages={totalPages}
               onPageSelect={(p) => setCurrentPage(p)}

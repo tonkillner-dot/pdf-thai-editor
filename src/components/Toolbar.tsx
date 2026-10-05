@@ -22,6 +22,8 @@ import {
   Image as ImageIcon,
   RotateCw,
   Pipette,
+  Eraser,
+  Calculator,
 } from 'lucide-react';
 import type { CanvasItem } from '../types/pdf';
 import {
@@ -34,9 +36,11 @@ import {
 interface ToolbarProps {
   selectedBox: CanvasItem | null;
   onAddTextBox: () => void;
+  onAddWhiteout: () => void;
   onOpenShapes: () => void;
   onOpenImageUpload: () => void;
   onOpenStamps: () => void;
+  onInsertMathSymbol: (symbol: string) => void;
   onUpdateSelectedBox: (updates: Partial<CanvasItem>) => void;
   onDeleteSelectedBox: () => void;
   onDuplicateSelectedBox: () => void;
@@ -45,18 +49,25 @@ interface ToolbarProps {
   onPageChange: (newPage: number) => void;
   zoom: number;
   onZoomChange: (newZoom: number) => void;
+  onFitWidth: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
 }
 
+const MATH_SYMBOLS = [
+  '+', '-', '×', '÷', '=', '≠', '≤', '≥', '√', 'π', '°', '½', '¼', '¾', '²', '³', 'cm²', 'm²', '...', '✓', '★'
+];
+
 export const Toolbar: React.FC<ToolbarProps> = ({
   selectedBox,
   onAddTextBox,
+  onAddWhiteout,
   onOpenShapes,
   onOpenImageUpload,
   onOpenStamps,
+  onInsertMathSymbol,
   onUpdateSelectedBox,
   onDeleteSelectedBox,
   onDuplicateSelectedBox,
@@ -65,6 +76,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   onPageChange,
   zoom,
   onZoomChange,
+  onFitWidth,
   canUndo,
   canRedo,
   onUndo,
@@ -74,14 +86,31 @@ export const Toolbar: React.FC<ToolbarProps> = ({
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [showShapeFillPicker, setShowShapeFillPicker] = useState(false);
   const [showShapeStrokePicker, setShowShapeStrokePicker] = useState(false);
+  const [showMathSymbols, setShowMathSymbols] = useState(false);
 
   const isText = selectedBox && (selectedBox.type === 'text' || !selectedBox.type);
   const isShape = selectedBox && selectedBox.type === 'shape';
 
+  const closeAllPopups = () => {
+    setShowColorPicker(false);
+    setShowBgPicker(false);
+    setShowShapeFillPicker(false);
+    setShowShapeStrokePicker(false);
+    setShowMathSymbols(false);
+  };
+
   return (
-    <div className="w-full bg-white border-b border-slate-200 px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-xs z-10">
+    <div className="w-full bg-white border-b border-slate-200 px-3 py-2 flex flex-wrap items-center justify-between gap-2 shadow-xs z-10 relative">
+      {/* Invisible backdrop to dismiss popups on outside click */}
+      {(showColorPicker || showBgPicker || showShapeFillPicker || showShapeStrokePicker || showMathSymbols) && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          onClick={closeAllPopups}
+        />
+      )}
+
       {/* Group 1: Primary Insertion Tools */}
-      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+      <div className="flex items-center space-x-1.5 flex-wrap gap-y-1 relative z-50">
         <button
           onClick={onAddTextBox}
           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 shadow-xs cursor-pointer"
@@ -89,6 +118,16 @@ export const Toolbar: React.FC<ToolbarProps> = ({
         >
           <Plus className="w-4 h-4" />
           <span>ข้อความ</span>
+        </button>
+
+        {/* Whiteout / ลบปิดทับข้อความ */}
+        <button
+          onClick={onAddWhiteout}
+          className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-xs"
+          title="ลบหรือปิดทับข้อความเดิมใน PDF (Whiteout)"
+        >
+          <Eraser className="w-4 h-4 text-rose-600" />
+          <span>ปิดทับข้อความเดิม</span>
         </button>
 
         <button
@@ -109,12 +148,50 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <span>แทรกรูปภาพ</span>
         </button>
 
+        {/* Math Symbols Tool */}
+        <div className="relative">
+          <button
+            onClick={() => {
+              setShowMathSymbols(!showMathSymbols);
+              setShowColorPicker(false);
+              setShowBgPicker(false);
+            }}
+            className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer"
+            title="แทรกสัญลักษณ์คณิตศาสตร์ เช่น ×, ÷, ², √, π"
+          >
+            <Calculator className="w-4 h-4 text-amber-700" />
+            <span>สัญลักษณ์คณิต</span>
+          </button>
+
+          {showMathSymbols && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl p-3 z-50 min-w-[230px]">
+              <span className="text-[11px] font-bold text-slate-700 block mb-2">
+                คลิกเพื่อแทรกสัญลักษณ์:
+              </span>
+              <div className="grid grid-cols-5 gap-1.5">
+                {MATH_SYMBOLS.map((sym) => (
+                  <button
+                    key={sym}
+                    onClick={() => {
+                      onInsertMathSymbol(sym);
+                      setShowMathSymbols(false);
+                    }}
+                    className="p-1.5 text-center text-sm font-bold bg-slate-50 hover:bg-blue-600 hover:text-white rounded border border-slate-200 transition-colors cursor-pointer"
+                  >
+                    {sym}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={onOpenStamps}
-          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer"
+          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer"
           title="สแตมป์สำเร็จรูป เช่น ตรวจแล้ว, ครูนภรัฐ"
         >
-          <Stamp className="w-4 h-4 text-amber-600" />
+          <Stamp className="w-4 h-4 text-slate-700" />
           <span>สแตมป์</span>
         </button>
 
@@ -126,7 +203,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onClick={onUndo}
             disabled={!canUndo}
             className="p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded-md transition-colors cursor-pointer"
-            title="เลิกทำ (Undo)"
+            title="เลิกทำ (Ctrl+Z)"
           >
             <Undo2 className="w-4 h-4" />
           </button>
@@ -134,7 +211,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             onClick={onRedo}
             disabled={!canRedo}
             className="p-1.5 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent rounded-md transition-colors cursor-pointer"
-            title="ทำซ้ำ (Redo)"
+            title="ทำซ้ำ (Ctrl+Y)"
           >
             <Redo2 className="w-4 h-4" />
           </button>
@@ -143,7 +220,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 
       {/* Group 2: Contextual Element Formatter */}
       {selectedBox ? (
-        <div className="flex items-center flex-wrap gap-1.5 bg-slate-50 border border-blue-200 px-2 py-1 rounded-lg">
+        <div className="flex items-center flex-wrap gap-1.5 bg-slate-50 border border-blue-200 px-2 py-1 rounded-lg relative z-50">
           {/* TEXT FORMATTING */}
           {isText && (
             <>
@@ -258,6 +335,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   onClick={() => {
                     setShowColorPicker(!showColorPicker);
                     setShowBgPicker(false);
+                    setShowMathSymbols(false);
                   }}
                   className="flex items-center space-x-1 px-1.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-xs cursor-pointer"
                   title="สีตัวอักษร"
@@ -327,6 +405,7 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                   onClick={() => {
                     setShowBgPicker(!showBgPicker);
                     setShowColorPicker(false);
+                    setShowMathSymbols(false);
                   }}
                   className="flex items-center space-x-1 px-1.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-xs cursor-pointer"
                   title="เลือกสีพื้นหลังทึบ"
@@ -454,7 +533,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                       ))}
                     </div>
 
-                    {/* Transparent Option */}
                     <button
                       onClick={() => {
                         onUpdateSelectedBox({
@@ -622,21 +700,21 @@ export const Toolbar: React.FC<ToolbarProps> = ({
           <button
             onClick={onDuplicateSelectedBox}
             className="p-1 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer"
-            title="คัดลอก"
+            title="คัดลอก (Ctrl+D)"
           >
             <Copy className="w-3.5 h-3.5" />
           </button>
           <button
             onClick={onDeleteSelectedBox}
             className="p-1 text-slate-600 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
-            title="ลบ"
+            title="ลบ (กดปุ่ม Delete บนคีย์บอร์ด)"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
         </div>
       ) : (
         <div className="text-xs text-slate-400 italic hidden lg:inline">
-          คลิกที่ข้อความ รูปทรง หรือรูปภาพเพื่อปรับแต่ง
+          คลิกที่ข้อความ รูปทรง หรือรูปภาพเพื่อปรับแต่ง (กด Delete เพื่อลบ)
         </div>
       )}
 
@@ -683,6 +761,13 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             title="ขยายขนาด"
           >
             <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={onFitWidth}
+            className="px-1.5 py-0.5 text-slate-700 hover:bg-slate-200 rounded font-semibold text-[11px] cursor-pointer"
+            title="ปรับความกว้างพอดีหน้าจอ"
+          >
+            พอดีหน้า
           </button>
           <button
             onClick={() => onZoomChange(1.0)}

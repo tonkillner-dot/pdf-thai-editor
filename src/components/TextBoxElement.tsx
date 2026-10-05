@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import type { CanvasItem } from '../types/pdf';
-import { GripVertical, X, RotateCw } from 'lucide-react';
+import { GripVertical, X, RotateCw, Edit3 } from 'lucide-react';
 
 interface TextBoxElementProps {
   box: CanvasItem;
@@ -11,6 +11,8 @@ interface TextBoxElementProps {
   containerWidth: number;
   containerHeight: number;
 }
+
+type ResizeDirection = 'nw' | 'ne' | 'se' | 'sw' | 'e' | 's';
 
 export const TextBoxElement: React.FC<TextBoxElementProps> = ({
   box,
@@ -31,7 +33,7 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
   // Convert percentages to pixels for current display container
   const leftPx = (box.xPercent / 100) * containerWidth;
   const topPx = (box.yPercent / 100) * containerHeight;
-  const widthPx = Math.max(30, (box.widthPercent / 100) * containerWidth);
+  const widthPx = Math.max(25, (box.widthPercent / 100) * containerWidth);
   const heightPx = Math.max(20, (box.heightPercent / 100) * containerHeight);
 
   // Scaled font size relative to standard 800px width
@@ -46,20 +48,19 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
     }
   }, [isEditing]);
 
-  // Handle Dragging
-  const handleDragStart = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Unified Mouse & Touch Dragging
+  const startDrag = (clientX: number, clientY: number) => {
     onSelect();
     setIsDragging(true);
 
-    const startMouseX = e.clientX;
-    const startMouseY = e.clientY;
+    const startMouseX = clientX;
+    const startMouseY = clientY;
     const startLeft = leftPx;
     const startTop = topPx;
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - startMouseX;
-      const dy = moveEvent.clientY - startMouseY;
+    const onMove = (moveX: number, moveY: number) => {
+      const dx = moveX - startMouseX;
+      const dy = moveY - startMouseY;
 
       let newLeft = startLeft + dx;
       let newTop = startTop + dy;
@@ -73,53 +74,102 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
       onUpdate({ xPercent: newXPercent, yPercent: newYPercent });
     };
 
-    const onMouseUp = () => {
-      setIsDragging(false);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+    const mouseMoveHandler = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const touchMoveHandler = (e: TouchEvent) => {
+      if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    const stopDrag = () => {
+      setIsDragging(false);
+      window.removeEventListener('mousemove', mouseMoveHandler);
+      window.removeEventListener('mouseup', stopDrag);
+      window.removeEventListener('touchmove', touchMoveHandler);
+      window.removeEventListener('touchend', stopDrag);
+    };
+
+    window.addEventListener('mousemove', mouseMoveHandler);
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('touchmove', touchMoveHandler);
+    window.addEventListener('touchend', stopDrag);
   };
 
-  // Handle Resizing
-  const handleResizeStart = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Unified Mouse & Touch Resizing
+  const startResize = (clientX: number, clientY: number, direction: ResizeDirection) => {
     onSelect();
     setIsResizing(true);
 
-    const startMouseX = e.clientX;
-    const startMouseY = e.clientY;
+    const startX = clientX;
+    const startY = clientY;
+    const startL = leftPx;
+    const startT = topPx;
     const startW = widthPx;
     const startH = heightPx;
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - startMouseX;
-      const dy = moveEvent.clientY - startMouseY;
+    const onMove = (moveX: number, moveY: number) => {
+      const dx = moveX - startX;
+      const dy = moveY - startY;
 
-      const newW = Math.max(30, startW + dx);
-      const newH = Math.max(20, startH + dy);
+      let newW = startW;
+      let newH = startH;
+      let newL = startL;
+      let newT = startT;
+
+      if (direction === 'se') {
+        newW = Math.max(25, startW + dx);
+        newH = Math.max(20, startH + dy);
+      } else if (direction === 'e') {
+        newW = Math.max(25, startW + dx);
+      } else if (direction === 's') {
+        newH = Math.max(20, startH + dy);
+      } else if (direction === 'sw') {
+        newW = Math.max(25, startW - dx);
+        newL = startL + (startW - newW);
+        newH = Math.max(20, startH + dy);
+      } else if (direction === 'ne') {
+        newW = Math.max(25, startW + dx);
+        newH = Math.max(20, startH - dy);
+        newT = startT + (startH - newH);
+      } else if (direction === 'nw') {
+        newW = Math.max(25, startW - dx);
+        newL = startL + (startW - newW);
+        newH = Math.max(20, startH - dy);
+        newT = startT + (startH - newH);
+      }
 
       const newWPercent = (newW / containerWidth) * 100;
       const newHPercent = (newH / containerHeight) * 100;
+      const newXPercent = (newL / containerWidth) * 100;
+      const newYPercent = (newT / containerHeight) * 100;
 
-      onUpdate({ widthPercent: newWPercent, heightPercent: newHPercent });
+      onUpdate({
+        widthPercent: newWPercent,
+        heightPercent: newHPercent,
+        xPercent: newXPercent,
+        yPercent: newYPercent,
+      });
     };
 
-    const onMouseUp = () => {
+    const mouseMoveHandler = (e: MouseEvent) => onMove(e.clientX, e.clientY);
+    const touchMoveHandler = (e: TouchEvent) => {
+      if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY);
+    };
+
+    const stopResize = () => {
       setIsResizing(false);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('mousemove', mouseMoveHandler);
+      window.removeEventListener('mouseup', stopResize);
+      window.removeEventListener('touchmove', touchMoveHandler);
+      window.removeEventListener('touchend', stopResize);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('mousemove', mouseMoveHandler);
+    window.addEventListener('mouseup', stopResize);
+    window.addEventListener('touchmove', touchMoveHandler);
+    window.addEventListener('touchend', stopResize);
   };
 
-  // Handle Rotation
-  const handleRotateStart = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  // Unified Mouse & Touch Rotation
+  const startRotate = () => {
     onSelect();
     setIsRotating(true);
 
@@ -128,26 +178,34 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
 
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - centerX;
-      const dy = moveEvent.clientY - centerY;
+    const onMove = (moveX: number, moveY: number, shiftKey: boolean = false) => {
+      const dx = moveX - centerX;
+      const dy = moveY - centerY;
       let angle = Math.round((Math.atan2(dy, dx) * 180) / Math.PI) + 90;
       if (angle < 0) angle += 360;
-      // Snap to 15 degrees if shift key is pressed
-      if (moveEvent.shiftKey) {
+      if (shiftKey) {
         angle = Math.round(angle / 15) * 15;
       }
       onUpdate({ rotation: angle % 360 });
     };
 
-    const onMouseUp = () => {
-      setIsRotating(false);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+    const mouseMoveHandler = (e: MouseEvent) => onMove(e.clientX, e.clientY, e.shiftKey);
+    const touchMoveHandler = (e: TouchEvent) => {
+      if (e.touches[0]) onMove(e.touches[0].clientX, e.touches[0].clientY, false);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    const stopRotate = () => {
+      setIsRotating(false);
+      window.removeEventListener('mousemove', mouseMoveHandler);
+      window.removeEventListener('mouseup', stopRotate);
+      window.removeEventListener('touchmove', touchMoveHandler);
+      window.removeEventListener('touchend', stopRotate);
+    };
+
+    window.addEventListener('mousemove', mouseMoveHandler);
+    window.addEventListener('mouseup', stopRotate);
+    window.addEventListener('touchmove', touchMoveHandler);
+    window.addEventListener('touchend', stopRotate);
   };
 
   // Render content based on element type
@@ -193,7 +251,7 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
             />
           )}
           {shape === 'line' && (
-            <line x1="2" y1="50" x2="98" y2="50" stroke={stroke} strokeWidth={Math.max(2, strokeW)} />
+            <line x1="2" y1="50" x2="98" y2="50" stroke={stroke} strokeWidth={Math.max(2, strokeW)} strokeLinecap="round" />
           )}
         </svg>
       );
@@ -225,18 +283,25 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
           color: box.color,
           textAlign: box.textAlign,
           backgroundColor: 'transparent',
+          lineHeight: '1.45',
         }}
-        className="w-full h-full resize-none border-none outline-none p-0 bg-transparent overflow-hidden leading-snug"
+        className="w-full h-full resize-none border-none outline-none p-0 bg-transparent overflow-hidden"
         autoFocus
       />
     ) : (
       <div
-        className="w-full h-full whitespace-pre-wrap break-words leading-snug cursor-text"
+        className="w-full h-full whitespace-pre-wrap break-words leading-relaxed cursor-text"
+        onClick={() => {
+          if (isSelected) setIsEditing(true);
+        }}
         onDoubleClick={() => setIsEditing(true)}
       >
-        {box.text || (
-          <span className="text-slate-400 italic font-sans text-xs">
-            (ดับเบิลคลิกเพื่อพิมพ์ข้อความ)
+        {box.text ? (
+          box.text
+        ) : (
+          <span className="text-slate-400 italic font-sans text-xs flex items-center space-x-1">
+            <Edit3 className="w-3 h-3 inline mr-1" />
+            (คลิกเพื่อพิมพ์ข้อความ)
           </span>
         )}
       </div>
@@ -287,17 +352,24 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
         isSelected
           ? 'ring-2 ring-blue-500 shadow-md cursor-move z-30'
           : 'hover:ring-1 hover:ring-blue-300 cursor-pointer z-10'
-      } ${isDragging ? 'opacity-80' : ''} ${isResizing ? 'ring-2 ring-amber-500' : ''} ${
+      } ${isDragging ? 'opacity-75' : ''} ${isResizing ? 'ring-2 ring-amber-500' : ''} ${
         isRotating ? 'ring-2 ring-purple-500' : ''
       }`}
     >
-      {/* Selection Control Handles */}
+      {/* Control Handles & Action Bar */}
       {isSelected && (
         <>
-          {/* Top Drag Bar */}
+          {/* Top Drag & Info Bar */}
           <div
-            onMouseDown={handleDragStart}
-            className="absolute -top-6 left-0 right-0 h-6 bg-blue-600 rounded-t flex items-center justify-between px-1.5 text-white text-[11px] font-sans shadow-xs cursor-move z-40"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startDrag(e.clientX, e.clientY);
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+            }}
+            className="absolute -top-6 left-0 right-0 h-6 bg-blue-600 rounded-t flex items-center justify-between px-1.5 text-white text-[11px] font-sans shadow-xs cursor-move z-40 select-none"
           >
             <div className="flex items-center space-x-1">
               <GripVertical className="w-3.5 h-3.5 opacity-80" />
@@ -306,34 +378,132 @@ export const TextBoxElement: React.FC<TextBoxElementProps> = ({
                 {box.rotation ? ` (${box.rotation}°)` : ''}
               </span>
             </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-              className="p-0.5 hover:bg-blue-700 rounded cursor-pointer"
-              title="ลบ"
-            >
-              <X className="w-3 h-3" />
-            </button>
+            <div className="flex items-center space-x-1">
+              {isText && !isEditing && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsEditing(true);
+                  }}
+                  className="p-0.5 hover:bg-blue-700 rounded cursor-pointer"
+                  title="แก้ไขข้อความ"
+                >
+                  <Edit3 className="w-3 h-3" />
+                </button>
+              )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                className="p-0.5 hover:bg-blue-700 rounded cursor-pointer"
+                title="ลบ"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           {/* Top Rotation Handle */}
           <div
-            onMouseDown={handleRotateStart}
-            className="absolute -top-11 left-1/2 -translate-x-1/2 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing hover:scale-110 transition-transform z-40 border border-white"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startRotate();
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              startRotate();
+            }}
+            className="absolute -top-11 left-1/2 -translate-x-1/2 w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-md cursor-grab active:cursor-grabbing hover:scale-115 transition-transform z-40 border border-white"
             title="ลากเพื่อหมุน (กด Shift เพื่อหมุนทีละ 15°)"
           >
             <RotateCw className="w-3.5 h-3.5" />
           </div>
-          {/* Connecting line to rotation handle */}
           <div className="absolute -top-5 left-1/2 w-px h-5 bg-purple-500 -translate-x-1/2 pointer-events-none z-30" />
 
-          {/* Bottom-right Resize Handle */}
+          {/* Resize Handles (Corners & Edges) */}
+          {/* SE (Bottom Right) */}
           <div
-            onMouseDown={handleResizeStart}
-            className="absolute -bottom-2 -right-2 w-4 h-4 bg-blue-600 border-2 border-white rounded-full shadow cursor-se-resize z-40"
-            title="ปรับขนาด"
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startResize(e.clientX, e.clientY, 'se');
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY, 'se');
+            }}
+            className="absolute -bottom-1.5 -right-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow cursor-se-resize z-40 hover:scale-125 transition-transform"
+            title="ปรับขนาดมุมขวาล่าง"
+          />
+
+          {/* SW (Bottom Left) */}
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startResize(e.clientX, e.clientY, 'sw');
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY, 'sw');
+            }}
+            className="absolute -bottom-1.5 -left-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow cursor-sw-resize z-40 hover:scale-125 transition-transform"
+            title="ปรับขนาดมุมซ้ายล่าง"
+          />
+
+          {/* NE (Top Right) */}
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startResize(e.clientX, e.clientY, 'ne');
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY, 'ne');
+            }}
+            className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow cursor-ne-resize z-40 hover:scale-125 transition-transform"
+            title="ปรับขนาดมุมขวาบน"
+          />
+
+          {/* NW (Top Left) */}
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startResize(e.clientX, e.clientY, 'nw');
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY, 'nw');
+            }}
+            className="absolute -top-1.5 -left-1.5 w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow cursor-nw-resize z-40 hover:scale-125 transition-transform"
+            title="ปรับขนาดมุมซ้ายบน"
+          />
+
+          {/* E (Middle Right for width only) */}
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startResize(e.clientX, e.clientY, 'e');
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY, 'e');
+            }}
+            className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow cursor-e-resize z-40 hover:scale-125 transition-transform"
+            title="ปรับความกว้าง"
+          />
+
+          {/* S (Middle Bottom for height only) */}
+          <div
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              startResize(e.clientX, e.clientY, 's');
+            }}
+            onTouchStart={(e) => {
+              e.stopPropagation();
+              if (e.touches[0]) startResize(e.touches[0].clientX, e.touches[0].clientY, 's');
+            }}
+            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white border-2 border-blue-600 rounded-sm shadow cursor-s-resize z-40 hover:scale-125 transition-transform"
+            title="ปรับความสูง"
           />
         </>
       )}
