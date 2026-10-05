@@ -21,9 +21,15 @@ import {
   Shapes,
   Image as ImageIcon,
   RotateCw,
+  Pipette,
 } from 'lucide-react';
 import type { CanvasItem } from '../types/pdf';
-import { THAI_FONTS, COLOR_PALETTE, BG_COLOR_PALETTE } from '../utils/thaiFonts';
+import {
+  THAI_FONTS,
+  EXPANDED_COLORS,
+  PASTEL_COLORS,
+  BG_COLOR_PALETTE,
+} from '../utils/thaiFonts';
 
 interface ToolbarProps {
   selectedBox: CanvasItem | null;
@@ -66,6 +72,8 @@ export const Toolbar: React.FC<ToolbarProps> = ({
 }) => {
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showBgPicker, setShowBgPicker] = useState(false);
+  const [showShapeFillPicker, setShowShapeFillPicker] = useState(false);
+  const [showShapeStrokePicker, setShowShapeStrokePicker] = useState(false);
 
   const isText = selectedBox && (selectedBox.type === 'text' || !selectedBox.type);
   const isShape = selectedBox && selectedBox.type === 'shape';
@@ -262,18 +270,34 @@ export const Toolbar: React.FC<ToolbarProps> = ({
                 </button>
 
                 {showColorPicker && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-xl rounded-lg p-2 grid grid-cols-4 gap-1.5 z-50 min-w-[120px]">
-                    {COLOR_PALETTE.map((c) => (
-                      <button
-                        key={c}
-                        onClick={() => {
-                          onUpdateSelectedBox({ color: c });
-                          setShowColorPicker(false);
-                        }}
-                        className="w-5 h-5 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer"
-                        style={{ backgroundColor: c }}
-                      />
-                    ))}
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-xl rounded-xl p-3 z-50 min-w-[220px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-bold text-slate-700">เลือกสีตัวอักษร</span>
+                      <label className="flex items-center space-x-1 text-[10px] text-blue-600 cursor-pointer">
+                        <Pipette className="w-3 h-3" />
+                        <span>จานสี</span>
+                        <input
+                          type="color"
+                          value={selectedBox.color || '#000000'}
+                          onChange={(e) => onUpdateSelectedBox({ color: e.target.value })}
+                          className="w-4 h-4 cursor-pointer border-0 p-0 bg-transparent"
+                        />
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-7 gap-1.5 max-h-36 overflow-y-auto p-1">
+                      {EXPANDED_COLORS.map((c) => (
+                        <button
+                          key={c.hex}
+                          onClick={() => {
+                            onUpdateSelectedBox({ color: c.hex });
+                            setShowColorPicker(false);
+                          }}
+                          className="w-5 h-5 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer"
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -282,7 +306,6 @@ export const Toolbar: React.FC<ToolbarProps> = ({
               <div className="relative flex items-center space-x-1">
                 <button
                   onClick={() => {
-                    // Quick solid whiteout / solid fill toggle
                     const isCurrentlyTransparent =
                       !selectedBox.backgroundColor || selectedBox.backgroundColor === 'transparent';
                     onUpdateSelectedBox({
@@ -349,18 +372,215 @@ export const Toolbar: React.FC<ToolbarProps> = ({
             </>
           )}
 
-          {/* SHAPE FORMATTING */}
+          {/* ADVANCED SHAPE FORMATTING */}
           {isShape && (
-            <div className="flex items-center space-x-1.5">
-              <span className="text-[11px] font-bold text-slate-600">สีรูปทรง:</span>
-              <div className="flex items-center space-x-1">
-                {COLOR_PALETTE.slice(0, 6).map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => onUpdateSelectedBox({ fillColor: c, strokeColor: c })}
-                    className="w-5 h-5 rounded-full border border-slate-300 hover:scale-125 transition-transform cursor-pointer"
-                    style={{ backgroundColor: c }}
+            <div className="flex items-center space-x-2 flex-wrap">
+              {/* Shape Fill Color */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowShapeFillPicker(!showShapeFillPicker);
+                    setShowShapeStrokePicker(false);
+                  }}
+                  className="flex items-center space-x-1 px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-xs font-semibold cursor-pointer"
+                  title="เลือกสีพื้นรูปทรง (Fill)"
+                >
+                  <span className="text-slate-600">สีพื้น:</span>
+                  <div
+                    className="w-3.5 h-3.5 rounded-full border border-slate-400 shadow-xs"
+                    style={{
+                      backgroundColor:
+                        selectedBox.fillColor || selectedBox.backgroundColor || '#3b82f6',
+                    }}
                   />
+                </button>
+
+                {showShapeFillPicker && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl p-3 z-50 min-w-[240px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-800">สีพื้นรูปทรง</span>
+                      <label className="flex items-center space-x-1 text-xs text-blue-600 font-semibold cursor-pointer">
+                        <Pipette className="w-3.5 h-3.5" />
+                        <span>จานสีอิสระ</span>
+                        <input
+                          type="color"
+                          value={selectedBox.fillColor || '#3b82f6'}
+                          onChange={(e) =>
+                            onUpdateSelectedBox({
+                              fillColor: e.target.value,
+                              backgroundColor: e.target.value,
+                            })
+                          }
+                          className="w-4 h-4 cursor-pointer border-0 p-0 bg-transparent"
+                        />
+                      </label>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 mb-1">สียอดนิยม ({EXPANDED_COLORS.length}):</p>
+                    <div className="grid grid-cols-7 gap-1.5 max-h-32 overflow-y-auto p-1 mb-2">
+                      {EXPANDED_COLORS.map((c) => (
+                        <button
+                          key={c.hex}
+                          onClick={() => {
+                            onUpdateSelectedBox({
+                              fillColor: c.hex,
+                              backgroundColor: c.hex,
+                            });
+                            setShowShapeFillPicker(false);
+                          }}
+                          className="w-6 h-6 rounded-md border border-slate-300 hover:scale-120 transition-transform cursor-pointer"
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 mb-1">สีพาสเทล ({PASTEL_COLORS.length}):</p>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {PASTEL_COLORS.map((c) => (
+                        <button
+                          key={c.hex}
+                          onClick={() => {
+                            onUpdateSelectedBox({
+                              fillColor: c.hex,
+                              backgroundColor: c.hex,
+                            });
+                            setShowShapeFillPicker(false);
+                          }}
+                          className="w-7 h-5 rounded-md border border-slate-300 hover:scale-115 transition-transform cursor-pointer"
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+
+                    {/* Transparent Option */}
+                    <button
+                      onClick={() => {
+                        onUpdateSelectedBox({
+                          fillColor: 'transparent',
+                          backgroundColor: 'transparent',
+                        });
+                        setShowShapeFillPicker(false);
+                      }}
+                      className="w-full mt-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold cursor-pointer"
+                    >
+                      พื้นหลังโปร่งใส (มีเฉพาะเส้นขอบ)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Shape Stroke / Border Color */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowShapeStrokePicker(!showShapeStrokePicker);
+                    setShowShapeFillPicker(false);
+                  }}
+                  className="flex items-center space-x-1 px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-xs font-semibold cursor-pointer"
+                  title="เลือกสีเส้นขอบรูปทรง (Stroke)"
+                >
+                  <span className="text-slate-600">เส้นขอบ:</span>
+                  <div
+                    className="w-3.5 h-3.5 rounded-full border-2 border-white shadow-xs"
+                    style={{
+                      backgroundColor:
+                        selectedBox.strokeColor || selectedBox.borderColor || '#1d4ed8',
+                    }}
+                  />
+                </button>
+
+                {showShapeStrokePicker && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-2xl rounded-xl p-3 z-50 min-w-[240px]">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-slate-800">สีเส้นขอบรูปทรง</span>
+                      <label className="flex items-center space-x-1 text-xs text-blue-600 font-semibold cursor-pointer">
+                        <Pipette className="w-3.5 h-3.5" />
+                        <span>จานสีอิสระ</span>
+                        <input
+                          type="color"
+                          value={selectedBox.strokeColor || '#1d4ed8'}
+                          onChange={(e) =>
+                            onUpdateSelectedBox({
+                              strokeColor: e.target.value,
+                              borderColor: e.target.value,
+                            })
+                          }
+                          className="w-4 h-4 cursor-pointer border-0 p-0 bg-transparent"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1.5 max-h-36 overflow-y-auto p-1">
+                      {EXPANDED_COLORS.map((c) => (
+                        <button
+                          key={c.hex}
+                          onClick={() => {
+                            onUpdateSelectedBox({
+                              strokeColor: c.hex,
+                              borderColor: c.hex,
+                            });
+                            setShowShapeStrokePicker(false);
+                          }}
+                          className="w-6 h-6 rounded-md border border-slate-300 hover:scale-120 transition-transform cursor-pointer"
+                          style={{ backgroundColor: c.hex }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        onUpdateSelectedBox({
+                          strokeWidth: 0,
+                          borderWidth: 0,
+                          strokeColor: 'transparent',
+                        });
+                        setShowShapeStrokePicker(false);
+                      }}
+                      className="w-full mt-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-semibold cursor-pointer"
+                    >
+                      ไม่มีเส้นขอบ (ไร้ขอบ)
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Stroke Width */}
+              <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded px-1.5 py-0.5">
+                <span className="text-[10px] text-slate-500 font-bold">หนา:</span>
+                {[1, 2, 4, 6].map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => onUpdateSelectedBox({ strokeWidth: w, borderWidth: w })}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      (selectedBox.strokeWidth ?? selectedBox.borderWidth ?? 2) === w
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {w}px
+                  </button>
+                ))}
+              </div>
+
+              {/* Opacity Selector */}
+              <div className="flex items-center space-x-1 bg-white border border-slate-200 rounded px-1.5 py-0.5">
+                <span className="text-[10px] text-slate-500 font-bold">โปร่งใส:</span>
+                {[1, 0.75, 0.5, 0.25].map((op) => (
+                  <button
+                    key={op}
+                    onClick={() => onUpdateSelectedBox({ opacity: op })}
+                    className={`px-1 py-0.5 rounded text-[10px] font-bold cursor-pointer ${
+                      (selectedBox.opacity ?? 1) === op
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                    title={`ความทึบแสง ${Math.round(op * 100)}%`}
+                  >
+                    {Math.round(op * 100)}%
+                  </button>
                 ))}
               </div>
             </div>

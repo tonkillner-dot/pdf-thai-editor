@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Square,
@@ -8,8 +8,10 @@ import {
   ArrowRight,
   Minus,
   Sparkles,
+  Pipette,
 } from 'lucide-react';
 import type { ShapeType } from '../types/pdf';
+import { EXPANDED_COLORS, PASTEL_COLORS } from '../utils/thaiFonts';
 
 interface ShapesModalProps {
   isOpen: boolean;
@@ -27,27 +29,19 @@ const SHAPES_LIST: { id: ShapeType; name: string; icon: React.ReactNode; desc: s
   { id: 'line', name: 'เส้นตรง', icon: <Minus className="w-8 h-8" />, desc: 'เส้นคั่น หรือเส้นใต้สำหรับเขียนคำตอบ' },
 ];
 
-const PRESET_COLORS = [
-  { name: 'น้ำเงิน', fill: '#3b82f6', stroke: '#1d4ed8' },
-  { name: 'เขียว', fill: '#22c55e', stroke: '#15803d' },
-  { name: 'แดง', fill: '#ef4444', stroke: '#b91c1c' },
-  { name: 'ส้ม/ทอง', fill: '#f59e0b', stroke: '#b45309' },
-  { name: 'ม่วง', fill: '#a855f7', stroke: '#7e22ce' },
-  { name: 'เทา/ดำ', fill: '#64748b', stroke: '#334155' },
-];
-
 export const ShapesModal: React.FC<ShapesModalProps> = ({
   isOpen,
   onClose,
   onSelectShape,
 }) => {
-  const [selectedColor, setSelectedColor] = React.useState(PRESET_COLORS[0]);
+  const [currentColor, setCurrentColor] = useState<string>('#3b82f6');
+  const [colorTab, setColorTab] = useState<'vibrant' | 'pastel'>('vibrant');
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200">
         {/* Header */}
         <div
           className="px-5 py-4 text-white flex items-center justify-between"
@@ -55,7 +49,7 @@ export const ShapesModal: React.FC<ShapesModalProps> = ({
         >
           <div className="flex items-center space-x-2">
             <Sparkles className="w-5 h-5 text-amber-300" />
-            <h3 className="font-bold text-base">เลือกรูปทรงเรขาคณิต (Shapes)</h3>
+            <h3 className="font-bold text-base">เลือกรูปทรงเรขาคณิตและสี</h3>
           </div>
           <button
             onClick={onClose}
@@ -65,42 +59,110 @@ export const ShapesModal: React.FC<ShapesModalProps> = ({
           </button>
         </div>
 
-        {/* Color Palette Selector */}
-        <div className="p-4 bg-slate-50 border-b border-slate-200">
-          <label className="text-xs font-bold text-slate-700 block mb-1.5">
-            เลือกโทนสีของรูปทรง:
-          </label>
-          <div className="flex items-center space-x-2">
-            {PRESET_COLORS.map((c, i) => (
-              <button
-                key={i}
-                onClick={() => setSelectedColor(c)}
-                className={`w-7 h-7 rounded-full border-2 transition-transform cursor-pointer ${
-                  selectedColor.fill === c.fill
-                    ? 'scale-115 ring-2 ring-blue-500 border-white shadow'
-                    : 'border-slate-300 hover:scale-105'
-                }`}
-                style={{ backgroundColor: c.fill }}
-                title={c.name}
+        {/* Extensive Color Picker Section */}
+        <div className="p-4 bg-slate-50 border-b border-slate-200 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold text-slate-700">เลือกสีรูปทรง:</span>
+              <div className="flex rounded-lg border border-slate-300 overflow-hidden text-[11px] font-semibold bg-white">
+                <button
+                  onClick={() => setColorTab('vibrant')}
+                  className={`px-2.5 py-1 transition-colors cursor-pointer ${
+                    colorTab === 'vibrant'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  สียอดนิยม ({EXPANDED_COLORS.length})
+                </button>
+                <button
+                  onClick={() => setColorTab('pastel')}
+                  className={`px-2.5 py-1 transition-colors cursor-pointer ${
+                    colorTab === 'pastel'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  สีพาสเทล ({PASTEL_COLORS.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Custom Color Wheel / Input */}
+            <label className="flex items-center space-x-1.5 px-2 py-1 bg-white border border-slate-300 hover:border-blue-400 rounded-lg cursor-pointer shadow-xs text-xs">
+              <Pipette className="w-3.5 h-3.5 text-blue-600" />
+              <span className="font-medium text-slate-700">จานสีอิสระ</span>
+              <input
+                type="color"
+                value={currentColor}
+                onChange={(e) => setCurrentColor(e.target.value)}
+                className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
               />
-            ))}
+            </label>
+          </div>
+
+          {/* Color Swatches Grid */}
+          <div className="max-h-24 overflow-y-auto p-1 bg-white rounded-xl border border-slate-200">
+            {colorTab === 'vibrant' ? (
+              <div className="grid grid-cols-10 sm:grid-cols-15 gap-1.5">
+                {EXPANDED_COLORS.map((c, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentColor(c.hex)}
+                    className={`w-6 h-6 rounded-md border transition-all cursor-pointer ${
+                      currentColor.toLowerCase() === c.hex.toLowerCase()
+                        ? 'scale-125 ring-2 ring-blue-600 border-white shadow z-10'
+                        : 'border-slate-300 hover:scale-110'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+                {PASTEL_COLORS.map((c, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrentColor(c.hex)}
+                    className={`w-7 h-7 rounded-md border transition-all cursor-pointer ${
+                      currentColor.toLowerCase() === c.hex.toLowerCase()
+                        ? 'scale-125 ring-2 ring-blue-600 border-white shadow z-10'
+                        : 'border-slate-300 hover:scale-110'
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                    title={c.name}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Active color status */}
+          <div className="flex items-center space-x-2 text-xs">
+            <span className="text-slate-500">สีที่เลือกในขณะนี้:</span>
+            <div
+              className="w-4 h-4 rounded-full border border-slate-300 shadow-xs"
+              style={{ backgroundColor: currentColor }}
+            />
+            <span className="font-mono text-slate-700 font-bold uppercase">{currentColor}</span>
           </div>
         </div>
 
         {/* Shapes Grid */}
-        <div className="p-4 max-h-[60vh] overflow-y-auto grid grid-cols-2 gap-3">
+        <div className="p-4 max-h-[50vh] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-3">
           {SHAPES_LIST.map((shape) => (
             <div
               key={shape.id}
               onClick={() => {
-                onSelectShape(shape.id, selectedColor.fill);
+                onSelectShape(shape.id, currentColor);
                 onClose();
               }}
-              className="p-3.5 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer bg-white hover:bg-blue-50/40 flex flex-col items-center text-center group"
+              className="p-3 rounded-xl border border-slate-200 hover:border-blue-500 hover:shadow-md transition-all cursor-pointer bg-white hover:bg-blue-50/40 flex flex-col items-center text-center group"
             >
               <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center mb-2 transition-transform group-hover:scale-110 shadow-xs"
-                style={{ backgroundColor: `${selectedColor.fill}15`, color: selectedColor.fill }}
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-1.5 transition-transform group-hover:scale-110 shadow-xs"
+                style={{ backgroundColor: `${currentColor}20`, color: currentColor }}
               >
                 {shape.icon}
               </div>
@@ -115,7 +177,8 @@ export const ShapesModal: React.FC<ShapesModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+        <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500">
+          <span>คลิกที่รูปทรงเพื่อวางลงในหน้าเอกสารทันที</span>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition-colors cursor-pointer"

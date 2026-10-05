@@ -156,6 +156,54 @@ export const COLOR_PALETTE = [
   '#ffffff', // ขาว
 ];
 
+export const EXPANDED_COLORS = [
+  // มาตรฐาน & สดใส
+  { name: 'ดำสนิท', hex: '#000000' },
+  { name: 'เทาเข้ม', hex: '#334155' },
+  { name: 'เทากลาง', hex: '#64748b' },
+  { name: 'เทาเงิน', hex: '#94a3b8' },
+  { name: 'ขาวบริสุทธิ์', hex: '#ffffff' },
+  { name: 'แดงเข้ม (Crimson)', hex: '#991b1b' },
+  { name: 'แดง (Red)', hex: '#ef4444' },
+  { name: 'กุหลาบ (Rose)', hex: '#f43f5e' },
+  { name: 'ชมพูบานเย็น', hex: '#ec4899' },
+  { name: 'ชมพูสด (Pink)', hex: '#f472b6' },
+  { name: 'ม่วงเข้ม (Plum)', hex: '#581c87' },
+  { name: 'ม่วงลาเวนเดอร์', hex: '#9333ea' },
+  { name: 'ม่วงสด (Purple)', hex: '#a855f7' },
+  { name: 'ม่วงคราม (Indigo)', hex: '#6366f1' },
+  { name: 'น้ำเงินเข้ม (Navy)', hex: '#1e3a8a' },
+  { name: 'น้ำเงินหลัก (Royal)', hex: '#2563eb' },
+  { name: 'ฟ้าคราม (Blue)', hex: '#3b82f6' },
+  { name: 'ฟ้าทะเล (Ocean)', hex: '#0284c7' },
+  { name: 'ฟ้าสว่าง (Sky)', hex: '#0ea5e9' },
+  { name: 'ฟ้าไอซ์ (Cyan)', hex: '#06b6d4' },
+  { name: 'เขียวมิ้นต์ (Teal)', hex: '#14b8a6' },
+  { name: 'เขียวเข้ม (Forest)', hex: '#14532d' },
+  { name: 'เขียวมรกต (Emerald)', hex: '#16a34a' },
+  { name: 'เขียวสด (Green)', hex: '#22c55e' },
+  { name: 'เขียวมะนาว (Lime)', hex: '#84cc16' },
+  { name: 'เหลืองทอง (Gold)', hex: '#eab308' },
+  { name: 'เหลืองสว่าง (Yellow)', hex: '#facc15' },
+  { name: 'ส้มอำพัน (Amber)', hex: '#f59e0b' },
+  { name: 'ส้มสด (Orange)', hex: '#f97316' },
+  { name: 'น้ำตาลดินเผา', hex: '#9a3412' },
+  { name: 'น้ำตาลกาแฟ', hex: '#78350f' },
+];
+
+export const PASTEL_COLORS = [
+  { name: 'แดงพาสเทล', hex: '#fee2e2' },
+  { name: 'ส้มพาสเทล', hex: '#ffedd5' },
+  { name: 'เหลืองพาสเทล', hex: '#fef9c3' },
+  { name: 'เขียวพาสเทล', hex: '#dcfce7' },
+  { name: 'มิ้นต์พาสเทล', hex: '#ccfbf1' },
+  { name: 'ฟ้าพาสเทล', hex: '#e0f2fe' },
+  { name: 'ครามพาสเทล', hex: '#e0e7ff' },
+  { name: 'ม่วงพาสเทล', hex: '#f3e8ff' },
+  { name: 'ชมพูพาสเทล', hex: '#fce7f3' },
+  { name: 'เทาพาสเทล', hex: '#f1f5f9' },
+];
+
 export const BG_COLOR_PALETTE = [
   { name: 'โปร่งใส', value: 'transparent' },
   { name: 'ขาวทึบ', value: '#ffffff' },
