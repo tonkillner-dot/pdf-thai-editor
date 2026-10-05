@@ -1,5 +1,5 @@
 import { PDFDocument } from 'pdf-lib';
-import type { TextBoxItem } from '../types/pdf';
+import type { CanvasItem } from '../types/pdf';
 
 // Thai text word wrapping using Intl.Segmenter
 export function wrapThaiText(
@@ -14,7 +14,7 @@ export function wrapThaiText(
   if (typeof Intl !== 'undefined' && (Intl as any).Segmenter) {
     try {
       segmenter = new (Intl as any).Segmenter('th', { granularity: 'word' });
-    } catch (e) {
+    } catch {
       segmenter = null;
     }
   }
@@ -56,67 +56,176 @@ export function wrapThaiText(
   return lines;
 }
 
-// Draw a single text box onto a 2D canvas context at specified scale
-export function drawTextBoxOnCanvas(
+// Draw a geometric shape onto canvas
+function drawShape(
   ctx: CanvasRenderingContext2D,
-  box: TextBoxItem,
+  box: CanvasItem,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  scaleFactor: number
+) {
+  const shape = box.shapeType || 'rectangle';
+  const fillColor = box.fillColor || box.backgroundColor || '#3b82f6';
+  const strokeColor = box.strokeColor || box.borderColor || '#1d4ed8';
+  const strokeWidth = (box.strokeWidth ?? box.borderWidth ?? 2) * scaleFactor;
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeWidth;
+
+  ctx.beginPath();
+
+  if (shape === 'rectangle') {
+    ctx.rect(x, y, w, h);
+  } else if (shape === 'rounded-rectangle') {
+    roundRect(ctx, x, y, w, h, (box.borderRadius || 12) * scaleFactor);
+  } else if (shape === 'circle') {
+    ctx.ellipse(x + w / 2, y + h / 2, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2);
+  } else if (shape === 'triangle') {
+    ctx.moveTo(x + w / 2, y);
+    ctx.lineTo(x + w, y + h);
+    ctx.lineTo(x, y + h);
+    ctx.closePath();
+  } else if (shape === 'star') {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const outerR = Math.min(w, h) / 2;
+    const innerR = outerR * 0.4;
+    const spikes = 5;
+    let rot = (Math.PI / 2) * 3;
+    const step = Math.PI / spikes;
+
+    ctx.moveTo(cx, cy - outerR);
+    for (let i = 0; i < spikes; i++) {
+      ctx.lineTo(cx + Math.cos(rot) * outerR, cy + Math.sin(rot) * outerR);
+      rot += step;
+      ctx.lineTo(cx + Math.cos(rot) * innerR, cy + Math.sin(rot) * innerR);
+      rot += step;
+    }
+    ctx.closePath();
+  } else if (shape === 'arrow') {
+    const headW = w * 0.35;
+    const stemH = h * 0.4;
+    const stemTop = y + (h - stemH) / 2;
+    const stemBottom = stemTop + stemH;
+
+    ctx.moveTo(x, stemTop);
+    ctx.lineTo(x + w - headW, stemTop);
+    ctx.lineTo(x + w - headW, y);
+    ctx.lineTo(x + w, y + h / 2);
+    ctx.lineTo(x + w - headW, y + h);
+    ctx.lineTo(x + w - headW, stemBottom);
+    ctx.lineTo(x, stemBottom);
+    ctx.closePath();
+  } else if (shape === 'line') {
+    ctx.moveTo(x, y + h / 2);
+    ctx.lineTo(x + w, y + h / 2);
+  }
+
+  if (shape !== 'line') {
+    if (fillColor && fillColor !== 'transparent') {
+      ctx.fill();
+    }
+  }
+
+  if (strokeWidth > 0 && strokeColor && strokeColor !== 'transparent') {
+    ctx.stroke();
+  }
+}
+
+// Draw a single element (Text, Shape, Image) on canvas with rotation and styles
+export async function drawItemOnCanvas(
+  ctx: CanvasRenderingContext2D,
+  item: CanvasItem,
   pageWidth: number,
   pageHeight: number
 ) {
-  const x = (box.xPercent / 100) * pageWidth;
-  const y = (box.yPercent / 100) * pageHeight;
-  const width = (box.widthPercent / 100) * pageWidth;
-  const height = (box.heightPercent / 100) * pageHeight;
+  const x = (item.xPercent / 100) * pageWidth;
+  const y = (item.yPercent / 100) * pageHeight;
+  const width = (item.widthPercent / 100) * pageWidth;
+  const height = (item.heightPercent / 100) * pageHeight;
 
-  // Scaling factor relative to typical 800px display width
+  // Center point for rotation
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+
   const scaleFactor = pageWidth / 800;
-  const scaledFontSize = Math.max(10, box.fontSize * scaleFactor);
-  const padding = (box.padding || 8) * scaleFactor;
-  const borderRadius = (box.borderRadius || 6) * scaleFactor;
-  const borderWidth = (box.borderWidth || 0) * scaleFactor;
 
   ctx.save();
-  ctx.globalAlpha = box.opacity ?? 1;
+  ctx.globalAlpha = item.opacity ?? 1;
 
-  // Background and border
-  if (box.backgroundColor && box.backgroundColor !== 'transparent') {
-    ctx.fillStyle = box.backgroundColor;
-    roundRect(ctx, x, y, width, height, borderRadius);
-    ctx.fill();
+  // Apply rotation if any
+  if (item.rotation && item.rotation !== 0) {
+    ctx.translate(cx, cy);
+    ctx.rotate((item.rotation * Math.PI) / 180);
+    ctx.translate(-cx, -cy);
   }
 
-  if (borderWidth > 0 && box.borderColor) {
-    ctx.strokeStyle = box.borderColor;
-    ctx.lineWidth = borderWidth;
-    roundRect(ctx, x, y, width, height, borderRadius);
-    ctx.stroke();
-  }
+  if (item.type === 'shape') {
+    drawShape(ctx, item, x, y, width, height, scaleFactor);
+  } else if (item.type === 'image' && item.imageUrl) {
+    // Draw image
+    await new Promise<void>((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        ctx.drawImage(img, x, y, width, height);
+        resolve();
+      };
+      img.onerror = () => {
+        resolve();
+      };
+      img.src = item.imageUrl!;
+    });
+  } else {
+    // Text item
+    const scaledFontSize = Math.max(10, (item.fontSize || 18) * scaleFactor);
+    const padding = (item.padding || 8) * scaleFactor;
+    const borderRadius = (item.borderRadius || 6) * scaleFactor;
+    const borderWidth = (item.borderWidth || 0) * scaleFactor;
 
-  // Text setup
-  const fontStyle = box.fontStyle === 'italic' ? 'italic' : 'normal';
-  const fontWeight = box.fontWeight === 'bold' ? 'bold' : 'normal';
-  ctx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px '${box.fontFamily}', 'Sarabun', sans-serif`;
-  ctx.fillStyle = box.color || '#000000';
-  ctx.textBaseline = 'top';
-
-  const maxTextWidth = Math.max(10, width - padding * 2);
-  const lines = wrapThaiText(box.text || '', ctx, maxTextWidth);
-  const lineHeight = scaledFontSize * 1.35;
-
-  let startY = y + padding;
-
-  for (const line of lines) {
-    let startX = x + padding;
-    if (box.textAlign === 'center') {
-      const lineWidth = ctx.measureText(line).width;
-      startX = x + (width - lineWidth) / 2;
-    } else if (box.textAlign === 'right') {
-      const lineWidth = ctx.measureText(line).width;
-      startX = x + width - padding - lineWidth;
+    // Solid or background fill
+    if (item.backgroundColor && item.backgroundColor !== 'transparent') {
+      ctx.fillStyle = item.backgroundColor;
+      roundRect(ctx, x, y, width, height, borderRadius);
+      ctx.fill();
     }
 
-    ctx.fillText(line, startX, startY);
-    startY += lineHeight;
+    if (borderWidth > 0 && item.borderColor && item.borderColor !== 'transparent') {
+      ctx.strokeStyle = item.borderColor;
+      ctx.lineWidth = borderWidth;
+      roundRect(ctx, x, y, width, height, borderRadius);
+      ctx.stroke();
+    }
+
+    // Text typography
+    const fontStyle = item.fontStyle === 'italic' ? 'italic' : 'normal';
+    const fontWeight = item.fontWeight === 'bold' ? 'bold' : 'normal';
+    ctx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px '${item.fontFamily || 'Sarabun'}', 'Sarabun', sans-serif`;
+    ctx.fillStyle = item.color || '#000000';
+    ctx.textBaseline = 'top';
+
+    const maxTextWidth = Math.max(10, width - padding * 2);
+    const lines = wrapThaiText(item.text || '', ctx, maxTextWidth);
+    const lineHeight = scaledFontSize * 1.35;
+
+    let startY = y + padding;
+
+    for (const line of lines) {
+      let startX = x + padding;
+      if (item.textAlign === 'center') {
+        const lineWidth = ctx.measureText(line).width;
+        startX = x + (width - lineWidth) / 2;
+      } else if (item.textAlign === 'right') {
+        const lineWidth = ctx.measureText(line).width;
+        startX = x + width - padding - lineWidth;
+      }
+
+      ctx.fillText(line, startX, startY);
+      startY += lineHeight;
+    }
   }
 
   ctx.restore();
@@ -142,33 +251,32 @@ function roundRect(
 }
 
 /**
- * Export modified PDF preserving original vector content and overlaying Thai text
+ * Export modified PDF preserving original vector content and overlaying elements
  */
 export async function exportPdfWithOverlays(
   originalPdfBytes: Uint8Array,
-  textBoxes: TextBoxItem[],
+  items: CanvasItem[],
   onProgress?: (progress: number, status: string) => void
 ): Promise<Uint8Array> {
   onProgress?.(10, 'กำลังโหลดเอกสาร PDF...');
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
   const pageCount = pdfDoc.getPageCount();
 
-  // Resolution multiplier for crystal-sharp print quality (3x = ~300 DPI)
+  // Resolution multiplier for print quality (3x = ~300 DPI)
   const exportScale = 3.0;
 
   for (let i = 0; i < pageCount; i++) {
     const pageProgress = Math.round(15 + ((i + 1) / pageCount) * 70);
-    onProgress?.(pageProgress, `กำลังจัดรูปแบบและฝังฟอนต์ไทยหน้าที่ ${i + 1} จาก ${pageCount}...`);
+    onProgress?.(pageProgress, `กำลังจัดเตรียมหน้าที่ ${i + 1} จาก ${pageCount} (รูปภาพ/รูปทรง/ข้อความ)...`);
 
-    const pageBoxes = textBoxes.filter((b) => b.pageIndex === i);
-    if (pageBoxes.length === 0) {
+    const pageItems = items.filter((b) => b.pageIndex === i);
+    if (pageItems.length === 0) {
       continue;
     }
 
     const page = pdfDoc.getPage(i);
     const { width: ptWidth, height: ptHeight } = page.getSize();
 
-    // Create high-res offscreen canvas
     const canvasWidth = Math.round(ptWidth * exportScale);
     const canvasHeight = Math.round(ptHeight * exportScale);
 
@@ -178,9 +286,9 @@ export async function exportPdfWithOverlays(
     const ctx = canvas.getContext('2d');
     if (!ctx) continue;
 
-    // Draw all text boxes on this page
-    for (const box of pageBoxes) {
-      drawTextBoxOnCanvas(ctx, box, canvasWidth, canvasHeight);
+    // Draw all items sequentially
+    for (const item of pageItems) {
+      await drawItemOnCanvas(ctx, item, canvasWidth, canvasHeight);
     }
 
     // Convert to PNG blob
@@ -192,7 +300,6 @@ export async function exportPdfWithOverlays(
       const pngBuffer = await pngBlob.arrayBuffer();
       const pngImage = await pdfDoc.embedPng(new Uint8Array(pngBuffer));
 
-      // Draw overlay image onto page
       page.drawImage(pngImage, {
         x: 0,
         y: 0,

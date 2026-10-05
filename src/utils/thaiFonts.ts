@@ -1,4 +1,4 @@
-import type { ThaiFontDefinition } from '../types/pdf';
+import type { ThaiFontDefinition, ShapePreset } from '../types/pdf';
 
 export const THAI_FONTS: ThaiFontDefinition[] = [
   {
@@ -73,6 +73,16 @@ export const THAI_FONTS: ThaiFontDefinition[] = [
   },
 ];
 
+export const SHAPE_PRESETS: ShapePreset[] = [
+  { id: 'rectangle', name: 'สี่เหลี่ยมผืนผ้า', iconName: 'Square' },
+  { id: 'rounded-rectangle', name: 'สี่เหลี่ยมขอบมน', iconName: 'SquareCode' },
+  { id: 'circle', name: 'วงกลม / วงรี', iconName: 'Circle' },
+  { id: 'triangle', name: 'สามเหลี่ยม', iconName: 'Triangle' },
+  { id: 'star', name: 'ดาว 5 แฉก', iconName: 'Star' },
+  { id: 'arrow', name: 'ลูกศรชี้', iconName: 'ArrowRight' },
+  { id: 'line', name: 'เส้นตรง', iconName: 'Minus' },
+];
+
 export const QUICK_STAMPS = [
   {
     label: 'เครดิต: ครูนภรัฐ',
@@ -83,6 +93,7 @@ export const QUICK_STAMPS = [
     backgroundColor: '#eff6ff',
     borderColor: '#3b82f6',
     borderWidth: 1,
+    isSolidBackground: true,
   },
   {
     label: 'ตรวจแล้ว ✓',
@@ -93,6 +104,7 @@ export const QUICK_STAMPS = [
     backgroundColor: '#f0fdf4',
     borderColor: '#22c55e',
     borderWidth: 2,
+    isSolidBackground: true,
   },
   {
     label: 'ยอดเยี่ยม ★★★',
@@ -103,6 +115,7 @@ export const QUICK_STAMPS = [
     backgroundColor: '#fefce8',
     borderColor: '#eab308',
     borderWidth: 1,
+    isSolidBackground: true,
   },
   {
     label: 'กรอกชื่อ-นามสกุล',
@@ -113,6 +126,7 @@ export const QUICK_STAMPS = [
     backgroundColor: '#ffffff',
     borderColor: '#cbd5e1',
     borderWidth: 1,
+    isSolidBackground: true,
   },
   {
     label: 'ช่องคะแนน',
@@ -123,6 +137,7 @@ export const QUICK_STAMPS = [
     backgroundColor: '#fef2f2',
     borderColor: '#ef4444',
     borderWidth: 2,
+    isSolidBackground: true,
   },
 ];
 
@@ -143,11 +158,12 @@ export const COLOR_PALETTE = [
 
 export const BG_COLOR_PALETTE = [
   { name: 'โปร่งใส', value: 'transparent' },
-  { name: 'ขาว', value: '#ffffff' },
-  { name: 'เหลืองโน้ต', value: '#fef9c3' },
-  { name: 'เขียวอ่อน', value: '#dcfce7' },
-  { name: 'ฟ้าอ่อน', value: '#e0f2fe' },
-  { name: 'ชมพูอ่อน', value: '#fce7f3' },
-  { name: 'ส้มอ่อน', value: '#ffedd5' },
-  { name: 'น้ำเงินเข้ม', value: '#1e3a8a' },
+  { name: 'ขาวทึบ', value: '#ffffff' },
+  { name: 'เหลืองโน้ตทึบ', value: '#fef9c3' },
+  { name: 'เขียวอ่อนทึบ', value: '#dcfce7' },
+  { name: 'ฟ้าอ่อนทึบ', value: '#e0f2fe' },
+  { name: 'ชมพูอ่อนทึบ', value: '#fce7f3' },
+  { name: 'ส้มอ่อนทึบ', value: '#ffedd5' },
+  { name: 'น้ำเงินเข้มทึบ', value: '#1e3a8a' },
+  { name: 'ดำทึบ', value: '#0f172a' },
 ];

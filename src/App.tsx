@@ -1,17 +1,19 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   FileUp,
   Sparkles,
   Type,
   FileText,
-  MousePointerClick,
-  ShieldCheck,
+  Shapes,
+  Image as ImageIcon,
+  RotateCw,
 } from 'lucide-react';
-import type { TextBoxItem } from './types/pdf';
+import type { CanvasItem, ShapeType } from './types/pdf';
 import { Header } from './components/Header';
 import { Toolbar } from './components/Toolbar';
 import { Sidebar } from './components/Sidebar';
 import { CanvasArea } from './components/CanvasArea';
+import { ShapesModal } from './components/ShapesModal';
 import { QuickStampsModal } from './components/QuickStampsModal';
 import { ExportModal } from './components/ExportModal';
 import { loadPdfDocument } from './utils/pdfRenderer';
@@ -29,15 +31,16 @@ export const App: React.FC = () => {
   const [zoom, setZoom] = useState<number>(1.0);
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(false);
 
-  // Text boxes state
-  const [textBoxes, setTextBoxes] = useState<TextBoxItem[]>([]);
+  // Canvas elements state (Text, Shapes, Images)
+  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
   const [selectedBoxId, setSelectedBoxId] = useState<string | null>(null);
 
   // History for Undo / Redo
-  const [history, setHistory] = useState<TextBoxItem[][]>([]);
+  const [history, setHistory] = useState<CanvasItem[][]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
 
   // Modals state
+  const [isShapesModalOpen, setIsShapesModalOpen] = useState<boolean>(false);
   const [isStampsModalOpen, setIsStampsModalOpen] = useState<boolean>(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [exportProgress, setExportProgress] = useState<number>(0);
@@ -46,20 +49,21 @@ export const App: React.FC = () => {
   const [exportDownloadUrl, setExportDownloadUrl] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
-  // Push to history when text boxes change (debounced or explicit)
-  const pushHistory = (newBoxes: TextBoxItem[]) => {
+  // Push to history when canvas items change
+  const pushHistory = (newItems: CanvasItem[]) => {
     const updatedHistory = history.slice(0, historyIndex + 1);
-    setHistory([...updatedHistory, newBoxes]);
+    setHistory([...updatedHistory, newItems]);
     setHistoryIndex(updatedHistory.length);
-    setTextBoxes(newBoxes);
+    setCanvasItems(newItems);
   };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
       const prev = history[historyIndex - 1];
       setHistoryIndex(historyIndex - 1);
-      setTextBoxes(prev);
+      setCanvasItems(prev);
     }
   };
 
@@ -67,9 +71,35 @@ export const App: React.FC = () => {
     if (historyIndex < history.length - 1) {
       const next = history[historyIndex + 1];
       setHistoryIndex(historyIndex + 1);
-      setTextBoxes(next);
+      setCanvasItems(next);
     }
   };
+
+  // Support paste image from clipboard (Ctrl+V)
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (!pdfDoc) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          if (blob) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const dataUrl = event.target?.result as string;
+              addImageItem(dataUrl, 'รูปภาพวางจากคลิปบอร์ด');
+            };
+            reader.readAsDataURL(blob);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [pdfDoc, currentPage, canvasItems]);
 
   // Load PDF file from array buffer
   const loadPdf = async (buffer: Uint8Array, name: string) => {
@@ -82,7 +112,7 @@ export const App: React.FC = () => {
       setTotalPages(doc.numPages);
       setCurrentPage(1);
       setSelectedBoxId(null);
-      setTextBoxes([]);
+      setCanvasItems([]);
       setHistory([[]]);
       setHistoryIndex(0);
     } catch (err: any) {
@@ -99,15 +129,16 @@ export const App: React.FC = () => {
       const sampleBytes = await createSamplePdf();
       await loadPdf(sampleBytes, 'ใบงานคณิตศาสตร์_ตัวอย่าง.pdf');
 
-      // Add a couple default sample text boxes
-      const sampleBoxes: TextBoxItem[] = [
+      const sampleBoxes: CanvasItem[] = [
         {
           id: 'box-sample-1',
+          type: 'text',
           pageIndex: 0,
           xPercent: 12,
           yPercent: 33,
           widthPercent: 76,
           heightPercent: 6,
+          rotation: 0,
           text: 'วิธีทำ: พ.ท. สี่เหลี่ยมผืนผ้า = กว้าง x ยาว = 12 x 25 = 300 ตร.ซม.',
           fontFamily: 'Sarabun',
           fontSize: 16,
@@ -115,6 +146,7 @@ export const App: React.FC = () => {
           fontStyle: 'normal',
           color: '#1e3a8a',
           backgroundColor: '#eff6ff',
+          isSolidBackground: true,
           borderWidth: 1,
           borderColor: '#93c5fd',
           borderRadius: 6,
@@ -124,11 +156,13 @@ export const App: React.FC = () => {
         },
         {
           id: 'box-sample-2',
+          type: 'text',
           pageIndex: 0,
           xPercent: 12,
           yPercent: 47,
           widthPercent: 76,
           heightPercent: 6,
+          rotation: 0,
           text: 'คำนวณ: 125 x 48 = 6,000 จากนั้นบวก 350 ได้ผลลัพธ์คือ 6,350',
           fontFamily: 'Itim',
           fontSize: 18,
@@ -136,6 +170,7 @@ export const App: React.FC = () => {
           fontStyle: 'normal',
           color: '#15803d',
           backgroundColor: '#f0fdf4',
+          isSolidBackground: true,
           borderWidth: 1,
           borderColor: '#86efac',
           borderRadius: 6,
@@ -143,8 +178,23 @@ export const App: React.FC = () => {
           padding: 8,
           opacity: 1,
         },
+        {
+          id: 'shape-sample-star',
+          type: 'shape',
+          shapeType: 'star',
+          pageIndex: 0,
+          xPercent: 82,
+          yPercent: 62,
+          widthPercent: 8,
+          heightPercent: 6,
+          rotation: 15,
+          fillColor: '#f59e0b',
+          strokeColor: '#d97706',
+          strokeWidth: 2,
+          opacity: 1,
+        },
       ];
-      setTextBoxes(sampleBoxes);
+      setCanvasItems(sampleBoxes);
       setHistory([sampleBoxes]);
       setHistoryIndex(0);
     } catch (err: any) {
@@ -154,7 +204,7 @@ export const App: React.FC = () => {
     }
   };
 
-  // Handle file input change
+  // Handle file input change for PDF
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -173,15 +223,76 @@ export const App: React.FC = () => {
     e.target.value = '';
   };
 
+  // Handle file input change for Image
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      addImageItem(dataUrl, file.name);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Add Image item
+  const addImageItem = (dataUrl: string, fileName: string) => {
+    const newItem: CanvasItem = {
+      id: `img-${Date.now()}`,
+      type: 'image',
+      imageUrl: dataUrl,
+      imageFileName: fileName,
+      pageIndex: currentPage - 1,
+      xPercent: 30,
+      yPercent: 30,
+      widthPercent: 25,
+      heightPercent: 15,
+      rotation: 0,
+      opacity: 1,
+    };
+
+    const nextItems = [...canvasItems, newItem];
+    pushHistory(nextItems);
+    setSelectedBoxId(newItem.id);
+  };
+
+  // Add Geometric Shape item
+  const handleSelectShape = (shapeType: ShapeType, color: string) => {
+    const isLine = shapeType === 'line';
+    const newItem: CanvasItem = {
+      id: `shape-${Date.now()}`,
+      type: 'shape',
+      shapeType: shapeType,
+      pageIndex: currentPage - 1,
+      xPercent: 35,
+      yPercent: 35,
+      widthPercent: isLine ? 30 : 18,
+      heightPercent: isLine ? 4 : 12,
+      rotation: 0,
+      fillColor: isLine ? 'transparent' : color,
+      strokeColor: color,
+      strokeWidth: 2,
+      opacity: 1,
+    };
+
+    const nextItems = [...canvasItems, newItem];
+    pushHistory(nextItems);
+    setSelectedBoxId(newItem.id);
+  };
+
   // Add new text box on current page
   const handleAddTextBox = (customFont: string = 'Sarabun') => {
-    const newBox: TextBoxItem = {
+    const newBox: CanvasItem = {
       id: `box-${Date.now()}`,
+      type: 'text',
       pageIndex: currentPage - 1,
       xPercent: 25,
-      yPercent: 30 + (textBoxes.length % 5) * 5,
+      yPercent: 30 + (canvasItems.length % 5) * 5,
       widthPercent: 50,
       heightPercent: 7,
+      rotation: 0,
       text: 'พิมพ์ข้อความภาษาไทยที่นี่...',
       fontFamily: customFont,
       fontSize: 18,
@@ -189,6 +300,7 @@ export const App: React.FC = () => {
       fontStyle: 'normal',
       color: '#000000',
       backgroundColor: '#ffffff',
+      isSolidBackground: false,
       borderWidth: 1,
       borderColor: '#94a3b8',
       borderRadius: 6,
@@ -197,20 +309,22 @@ export const App: React.FC = () => {
       opacity: 1,
     };
 
-    const nextBoxes = [...textBoxes, newBox];
-    pushHistory(nextBoxes);
+    const nextItems = [...canvasItems, newBox];
+    pushHistory(nextItems);
     setSelectedBoxId(newBox.id);
   };
 
   // Add quick stamp
   const handleSelectStamp = (stamp: (typeof QUICK_STAMPS)[0]) => {
-    const newBox: TextBoxItem = {
+    const newBox: CanvasItem = {
       id: `stamp-${Date.now()}`,
+      type: 'text',
       pageIndex: currentPage - 1,
       xPercent: 30,
-      yPercent: 20 + (textBoxes.length % 5) * 6,
+      yPercent: 20 + (canvasItems.length % 5) * 6,
       widthPercent: 45,
       heightPercent: 6,
+      rotation: 0,
       text: stamp.text,
       fontFamily: stamp.fontFamily,
       fontSize: stamp.fontSize,
@@ -218,6 +332,7 @@ export const App: React.FC = () => {
       fontStyle: 'normal',
       color: stamp.color,
       backgroundColor: stamp.backgroundColor,
+      isSolidBackground: true,
       borderWidth: stamp.borderWidth,
       borderColor: stamp.borderColor,
       borderRadius: 8,
@@ -226,40 +341,39 @@ export const App: React.FC = () => {
       opacity: 1,
     };
 
-    const nextBoxes = [...textBoxes, newBox];
-    pushHistory(nextBoxes);
+    const nextItems = [...canvasItems, newBox];
+    pushHistory(nextItems);
     setSelectedBoxId(newBox.id);
   };
 
   // Update selected box
-  const handleUpdateBox = (id: string, updates: Partial<TextBoxItem>) => {
-    const nextBoxes = textBoxes.map((b) => (b.id === id ? { ...b, ...updates } : b));
-    setTextBoxes(nextBoxes);
-    // update history when relevant
+  const handleUpdateBox = (id: string, updates: Partial<CanvasItem>) => {
+    const nextItems = canvasItems.map((b) => (b.id === id ? { ...b, ...updates } : b));
+    setCanvasItems(nextItems);
   };
 
   // Delete box
   const handleDeleteBox = (id: string) => {
-    const nextBoxes = textBoxes.filter((b) => b.id !== id);
-    pushHistory(nextBoxes);
+    const nextItems = canvasItems.filter((b) => b.id !== id);
+    pushHistory(nextItems);
     if (selectedBoxId === id) setSelectedBoxId(null);
   };
 
   // Duplicate box
   const handleDuplicateBox = () => {
     if (!selectedBoxId) return;
-    const box = textBoxes.find((b) => b.id === selectedBoxId);
+    const box = canvasItems.find((b) => b.id === selectedBoxId);
     if (!box) return;
 
-    const newBox: TextBoxItem = {
+    const newBox: CanvasItem = {
       ...box,
-      id: `box-${Date.now()}`,
+      id: `${box.type || 'item'}-${Date.now()}`,
       xPercent: Math.min(90, box.xPercent + 3),
       yPercent: Math.min(90, box.yPercent + 3),
     };
 
-    const nextBoxes = [...textBoxes, newBox];
-    pushHistory(nextBoxes);
+    const nextItems = [...canvasItems, newBox];
+    pushHistory(nextItems);
     setSelectedBoxId(newBox.id);
   };
 
@@ -276,7 +390,7 @@ export const App: React.FC = () => {
     try {
       const finalBytes = await exportPdfWithOverlays(
         pdfBytes,
-        textBoxes,
+        canvasItems,
         (progress, status) => {
           setExportProgress(progress);
           setExportStatusText(status);
@@ -294,16 +408,23 @@ export const App: React.FC = () => {
     }
   };
 
-  const selectedBox = textBoxes.find((b) => b.id === selectedBoxId) || null;
+  const selectedBox = canvasItems.find((b) => b.id === selectedBoxId) || null;
 
   return (
     <div className="flex flex-col h-screen w-full bg-slate-100 overflow-hidden font-sarabun text-slate-800">
-      {/* Hidden File Input */}
+      {/* Hidden File Inputs */}
       <input
         ref={fileInputRef}
         type="file"
         accept="application/pdf,.pdf"
         onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageChange}
         className="hidden"
       />
 
@@ -314,7 +435,7 @@ export const App: React.FC = () => {
         onLoadSample={handleLoadSample}
         onExportClick={handleExport}
         hasPdf={pdfDoc !== null}
-        boxCount={textBoxes.length}
+        boxCount={canvasItems.length}
       />
 
       {/* Main Workspace */}
@@ -324,6 +445,8 @@ export const App: React.FC = () => {
           <Toolbar
             selectedBox={selectedBox}
             onAddTextBox={() => handleAddTextBox('Sarabun')}
+            onOpenShapes={() => setIsShapesModalOpen(true)}
+            onOpenImageUpload={() => imageInputRef.current?.click()}
             onOpenStamps={() => setIsStampsModalOpen(true)}
             onUpdateSelectedBox={(updates) => {
               if (selectedBoxId) handleUpdateBox(selectedBoxId, updates);
@@ -350,7 +473,7 @@ export const App: React.FC = () => {
               currentPage={currentPage}
               totalPages={totalPages}
               onPageSelect={(p) => setCurrentPage(p)}
-              textBoxes={textBoxes}
+              textBoxes={canvasItems}
               selectedBoxId={selectedBoxId}
               onSelectBox={(id) => setSelectedBoxId(id)}
               onDeleteBox={(id) => handleDeleteBox(id)}
@@ -362,7 +485,7 @@ export const App: React.FC = () => {
               pdfDoc={pdfDoc}
               currentPage={currentPage}
               zoom={zoom}
-              textBoxes={textBoxes}
+              textBoxes={canvasItems}
               selectedBoxId={selectedBoxId}
               onSelectBox={(id) => setSelectedBoxId(id)}
               onUpdateBox={handleUpdateBox}
@@ -384,7 +507,7 @@ export const App: React.FC = () => {
                 โปรแกรมแก้ไขเอกสาร PDF ภาษาไทย
               </h2>
               <p className="text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
-                เพิ่มกล่องข้อความภาษาไทยได้อย่างอิสระ เลือกฟอนต์ไทยแท้ได้ตามใจชอบ เช่น TH Sarabun, Itim, Kanit, Prompt, Mali สระและวรรณยุกต์ไม่ลอย ไม่ซ้อน พร้อมดาวน์โหลดไฟล์ PDF ที่คงความคมชัด 100%
+                เพิ่มกล่องข้อความภาษาไทย เติมทึบปิดทับข้อความเดิม หมุนข้อความอิสระ แทรกรูปทรงเรขาคณิต และรูปภาพ สระและวรรณยุกต์ไม่ลอย ไม่ซ้อน พร้อมดาวน์โหลดไฟล์ PDF คุณภาพคมชัด 100%
               </p>
             </div>
 
@@ -408,34 +531,44 @@ export const App: React.FC = () => {
             </div>
 
             {/* Feature Highlights Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-left border-t border-slate-100">
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                <div className="flex items-center space-x-2 text-blue-600 font-bold text-xs mb-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 text-left border-t border-slate-100">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <div className="flex items-center space-x-1.5 text-blue-600 font-bold text-xs mb-1">
                   <Type className="w-4 h-4" />
                   <span>ฟอนต์ไทย 10 แบบ</span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-normal">
-                  มีทั้งฟอนต์ทางการ ลายมือเด็ก และโมเดิร์น สระ-วรรณยุกต์คมชัดสมบูรณ์
+                  Sarabun, Itim, Kanit สระไม่ลอย ตัดคำอัตโนมัติ
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                <div className="flex items-center space-x-2 text-green-600 font-bold text-xs mb-1">
-                  <MousePointerClick className="w-4 h-4" />
-                  <span>ปรับแต่งอิสระ</span>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <div className="flex items-center space-x-1.5 text-indigo-600 font-bold text-xs mb-1">
+                  <Shapes className="w-4 h-4" />
+                  <span>รูปทรงเรขาคณิต</span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-normal">
-                  ลากย้าย ปรับขนาด หมุน เปลี่ยนสีพื้นหลัง สีตัวอักษร และใส่สแตมป์ตรวจ
+                  สี่เหลี่ยม วงกลม สามเหลี่ยม ดาว ลูกศร เส้นตรง
                 </p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/60">
-                <div className="flex items-center space-x-2 text-purple-600 font-bold text-xs mb-1">
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>รักษาต้นฉบับ 100%</span>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <div className="flex items-center space-x-1.5 text-purple-600 font-bold text-xs mb-1">
+                  <RotateCw className="w-4 h-4" />
+                  <span>หมุน & เติมทึบ</span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-normal">
-                  ส่งออกเป็น PDF คุณภาพสูง ฝังเลเยอร์ตัวหนังสือคมชัด ไม่บีบอัดภาพเดิม
+                  หมุน 0-360° เติมพื้นหลังทึบปิดทับข้อความเดิม
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60">
+                <div className="flex items-center space-x-1.5 text-emerald-600 font-bold text-xs mb-1">
+                  <ImageIcon className="w-4 h-4" />
+                  <span>แทรกรูปภาพ</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-normal">
+                  อัปโหลดรูป หรือวางภาพจากคลิปบอร์ด (Ctrl+V)
                 </p>
               </div>
             </div>
@@ -449,6 +582,13 @@ export const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Shapes Modal */}
+      <ShapesModal
+        isOpen={isShapesModalOpen}
+        onClose={() => setIsShapesModalOpen(false)}
+        onSelectShape={handleSelectShape}
+      />
 
       {/* Quick Stamps Modal */}
       <QuickStampsModal

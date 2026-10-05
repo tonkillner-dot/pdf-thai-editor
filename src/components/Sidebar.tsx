@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { Layers, Type, BookOpen, Trash2, Plus } from 'lucide-react';
-import type { TextBoxItem } from '../types/pdf';
+import { Layers, Shapes, BookOpen, Trash2, Plus, Image as ImageIcon, Type } from 'lucide-react';
+import type { CanvasItem } from '../types/pdf';
 import { THAI_FONTS } from '../utils/thaiFonts';
 
 interface SidebarProps {
   currentPage: number;
   totalPages: number;
   onPageSelect: (page: number) => void;
-  textBoxes: TextBoxItem[];
+  textBoxes: CanvasItem[];
   selectedBoxId: string | null;
   onSelectBox: (id: string) => void;
   onDeleteBox: (id: string) => void;
@@ -52,8 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               : 'text-slate-500 hover:text-slate-800'
           }`}
         >
-          <Type className="w-3.5 h-3.5" />
-          <span>ข้อความ ({currentPageBoxes.length})</span>
+          <Shapes className="w-3.5 h-3.5" />
+          <span>เลเยอร์ ({currentPageBoxes.length})</span>
         </button>
 
         <button
@@ -113,20 +113,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* TAB 2: Text Boxes on this page */}
+        {/* TAB 2: Layers (Text, Shapes, Images) */}
         {activeTab === 'boxes' && (
           <div className="space-y-2">
             <p className="text-[11px] text-slate-400 font-medium px-1">
-              กล่องข้อความในหน้า {currentPage}:
+              ออบเจกต์ในหน้า {currentPage}:
             </p>
 
             {currentPageBoxes.length === 0 ? (
               <div className="p-4 text-center text-xs text-slate-400 bg-slate-50 rounded-lg border border-dashed border-slate-200">
-                ยังไม่มีกล่องข้อความในหน้านี้ กดปุ่ม &quot;+ เพิ่มข้อความ&quot; เพื่อเริ่มต้น
+                ยังไม่มีข้อมูลในหน้านี้ เลือกเพิ่มข้อความ รูปทรงเรขาคณิต หรือแทรกรูปภาพจากแถบเครื่องมือ
               </div>
             ) : (
               currentPageBoxes.map((box, index) => {
                 const isSelected = box.id === selectedBoxId;
+                const isShape = box.type === 'shape';
+                const isImage = box.type === 'image';
+
                 return (
                   <div
                     key={box.id}
@@ -137,17 +140,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         : 'border-slate-200 bg-white hover:border-slate-300'
                     }`}
                   >
-                    <div className="truncate flex-1 pr-2">
-                      <div className="flex items-center space-x-1">
-                        <span className="text-[10px] font-bold text-slate-400">
-                          #{index + 1}
-                        </span>
-                        <span className="text-xs font-semibold text-slate-700 truncate">
-                          {box.text || '(ว่างเปล่า)'}
-                        </span>
+                    <div className="truncate flex-1 pr-2 flex items-center space-x-2">
+                      <div className="w-6 h-6 rounded flex items-center justify-center bg-slate-100 text-slate-600 shrink-0">
+                        {isShape ? (
+                          <Shapes className="w-3.5 h-3.5 text-indigo-600" />
+                        ) : isImage ? (
+                          <ImageIcon className="w-3.5 h-3.5 text-emerald-600" />
+                        ) : (
+                          <Type className="w-3.5 h-3.5 text-blue-600" />
+                        )}
                       </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        ฟอนต์: {box.fontFamily} • {box.fontSize}pt
+                      <div className="truncate">
+                        <div className="flex items-center space-x-1">
+                          <span className="text-[10px] font-bold text-slate-400">
+                            #{index + 1}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-700 truncate">
+                            {isShape
+                              ? `รูปทรง: ${box.shapeType || 'เรขาคณิต'}`
+                              : isImage
+                              ? `รูปภาพ: ${box.imageFileName || 'รูปภาพ'}`
+                              : box.text || '(ว่างเปล่า)'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {box.rotation ? `หมุน ${box.rotation}° • ` : ''}
+                          {isShape
+                            ? 'เวกเตอร์'
+                            : isImage
+                            ? 'ภาพแทรก'
+                            : `${box.fontFamily || 'Sarabun'} (${box.fontSize || 18}pt)`}
+                        </div>
                       </div>
                     </div>
                     <button
@@ -156,7 +179,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onDeleteBox(box.id);
                       }}
                       className="p-1 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 cursor-pointer"
-                      title="ลบกล่องนี้"
+                      title="ลบ"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -208,7 +231,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer info */}
       <div className="p-2.5 border-t border-slate-200 bg-slate-50 text-[11px] text-slate-500 text-center">
-        <span>รองรับสระ-วรรณยุกต์ไทย 100%</span>
+        <span>รองรับหมุน, รูปทรง, รูปภาพ, สระ-วรรณยุกต์ 100%</span>
       </div>
     </aside>
   );

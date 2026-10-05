@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import type { TextBoxItem } from '../types/pdf';
+import type { CanvasItem } from '../types/pdf';
 import { TextBoxElement } from './TextBoxElement';
 import { renderPageToCanvas } from '../utils/pdfRenderer';
 
@@ -7,10 +7,10 @@ interface CanvasAreaProps {
   pdfDoc: any;
   currentPage: number;
   zoom: number;
-  textBoxes: TextBoxItem[];
+  textBoxes: CanvasItem[];
   selectedBoxId: string | null;
   onSelectBox: (id: string | null) => void;
-  onUpdateBox: (id: string, updates: Partial<TextBoxItem>) => void;
+  onUpdateBox: (id: string, updates: Partial<CanvasItem>) => void;
   onDeleteBox: (id: string) => void;
   isLoading: boolean;
 }
